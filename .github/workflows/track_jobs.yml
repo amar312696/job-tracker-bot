@@ -1,0 +1,48 @@
+name: Job Alert Tracker
+
+on:
+  schedule:
+    # Run every 20 minutes (24/7, 100% free on GitHub Actions)
+    - cron: '*/20 * * * *'
+  workflow_dispatch: # Allows manual trigger from GitHub Actions web tab
+
+permissions:
+  contents: write
+
+jobs:
+  track-jobs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run Job Alert Scanner
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python main.py
+
+      - name: Commit & Push Updated Seen Jobs
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add seen_jobs.json
+          if git diff --staged --quiet; then
+            echo "No new jobs seen in this cycle. Nothing to commit."
+          else
+            git commit -m "chore: update seen_jobs.json [skip ci]"
+            git push
+          fi
